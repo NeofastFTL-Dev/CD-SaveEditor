@@ -36,10 +36,13 @@ jobs:
           - os: ubuntu-latest
             rid: linux-x64
             archive: CD-SaveEditor-linux-x64.tar.gz
-          - os: macos-14
+          # macOS runners are not available on this account, so the osx binaries
+          # are cross-published from Linux. Self-contained single-file output for
+          # both macOS architectures does not need a macOS host.
+          - os: ubuntu-latest
             rid: osx-arm64
             archive: CD-SaveEditor-osx-arm64.tar.gz
-          - os: macos-14
+          - os: ubuntu-latest
             rid: osx-x64
             archive: CD-SaveEditor-osx-x64.tar.gz
     steps:
