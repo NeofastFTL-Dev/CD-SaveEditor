@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Text;
 using CDSaveEditor;
 using CDSaveEditor.Game;
+using CDSaveEditor.LiveSplit;
 using CDSaveEditor.Saves;
 using CDSaveEditor.Storage;
 
@@ -17,6 +18,50 @@ void Check(string name, bool ok, string? detail = null)
     if (!ok)
     {
         failures++;
+    }
+}
+
+string? FindUp(string fileName)
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    for (var depth = 0; depth < 8 && dir is not null; depth++, dir = dir.Parent)
+    {
+        var candidate = Path.Combine(dir.FullName, fileName);
+        if (File.Exists(candidate))
+        {
+            return candidate;
+        }
+    }
+    return null;
+}
+
+static string ReadHeaders(Stream stream)
+{
+    var builder = new StringBuilder();
+    var buffer = new byte[1024];
+    while (!builder.ToString().Contains("\r\n\r\n", StringComparison.Ordinal))
+    {
+        var read = stream.Read(buffer, 0, buffer.Length);
+        if (read == 0)
+        {
+            break;
+        }
+        builder.Append(Encoding.ASCII.GetString(buffer, 0, read));
+    }
+    return builder.ToString();
+}
+
+static void ReadExact(Stream stream, byte[] buffer)
+{
+    var done = 0;
+    while (done < buffer.Length)
+    {
+        var read = stream.Read(buffer, done, buffer.Length - done);
+        if (read == 0)
+        {
+            throw new IOException("connection closed");
+        }
+        done += read;
     }
 }
 
@@ -196,6 +241,115 @@ try
     catch (ToolException)
     {
         Check("import rejects a malformed profile", true);
+    }
+
+    // ---------------------------------------------------------- splitter bridge
+    Check("ten stages can split", Arenas.Count == 10, Arenas.Count.ToString());
+    Check("stage names follow the arena table",
+        Arenas.SmackStages.Select(stage => stage.Name).SequenceEqual(Arenas.All.Take(Arenas.WonArenaSlots)));
+    Check("the two unrecordable arenas",
+        Arenas.All.Skip(Arenas.WonArenaSlots).SequenceEqual(new[] { "Lunarcy", "Shooting Stars" }));
+    Check("watched fields are the split fields",
+        Arenas.WonFields().SetEquals(Arenas.SmackStages.Select(stage => stage.Field)));
+    Check("race and flag wins are not smack wins",
+        Arenas.IsWonFlag("arenaWonFlags00") && !Arenas.IsWonFlag("arenaWonFlags01")
+        && !Arenas.IsWonFlag("arenaWonFlags02"));
+    Check("arena name lookup", Arenas.ArenaName("arenaWonFlags30") == "Swamp Stomp",
+        Arenas.ArenaName("arenaWonFlags30"));
+
+    var lss = LssFile.Xml();
+    var lssDocument = System.Xml.Linq.XDocument.Parse(lss);
+    var segmentNames = lssDocument.Root!.Element("Segments")!.Elements("Segment")
+        .Select(segment => segment.Element("Name")!.Value).ToList();
+    Check("lss has one split per stage", segmentNames.SequenceEqual(Arenas.SmackArenas),
+        string.Join("|", segmentNames));
+    Check("lss is the All Smacks category",
+        lssDocument.Root!.Element("CategoryName")!.Value == "All Smacks");
+    var committedLss = FindUp("All Smacks.lss");
+    if (committedLss is null)
+    {
+        Console.WriteLine("SKIP  All Smacks.lss not reachable from the test binary");
+    }
+    else
+    {
+        Check("the committed lss matches the code", File.ReadAllText(committedLss) == lss);
+    }
+
+    using (var profiles = new Profiles(rawPath))
+    {
+        var states = profiles.Read();
+        Check("profiles reads both slots", states is not null && states.Count == 2,
+            states is null ? "unreadable" : states.Count.ToString());
+        Check("profiles only reports split fields",
+            states!.Values.All(won => won.All(key => Arenas.WonFields().Contains(key))));
+        Check("profiles saw the imported win",
+            states.Values.Any(won => won.Contains("arenaWonFlags00")));
+    }
+
+    var emptyStates = new Dictionary<long, HashSet<string>> { [1] = new() };
+    var wonStates = new Dictionary<long, HashSet<string>> { [1] = new() { "arenaWonFlags00" } };
+    Check("the first read is a baseline", Splitter.Diff(null, emptyStates).Baseline);
+    Check("an unchanged profile does not split",
+        Splitter.Diff(emptyStates, emptyStates) is { Baseline: false, Fresh.Count: 0 });
+    Check("a new smack win is one split",
+        Splitter.Diff(emptyStates, wonStates).Fresh.SequenceEqual(new[] { "arenaWonFlags00" }));
+    Check("a cleared win is reported",
+        Splitter.Diff(wonStates, emptyStates).Cleared.SequenceEqual(new[] { "arenaWonFlags00" }));
+    Check("HOST:PORT parsing", Splitter.ParseHostPort("127.0.0.1:16834") == ("127.0.0.1", 16834));
+
+    var printed = new StringWriter();
+    var console = Console.Out;
+    Console.SetOut(printed);
+    using (var printer = new PrinterTimer())
+    {
+        printer.Send("splitOrStart");
+    }
+    Console.SetOut(console);
+    Check("dry run prints the command",
+        printed.ToString().Contains("-> splitOrStart", StringComparison.Ordinal), printed.ToString().Trim());
+
+    var tcpListener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+    tcpListener.Start();
+    var tcpPort = ((System.Net.IPEndPoint)tcpListener.LocalEndpoint).Port;
+    string? tcpLine = null;
+    var accepted = Task.Run(() =>
+    {
+        using var connection = tcpListener.AcceptTcpClient();
+        using var reader = new StreamReader(connection.GetStream(), Encoding.ASCII);
+        tcpLine = reader.ReadLine();
+    });
+    using (var timer = new TcpTimer("127.0.0.1", tcpPort))
+    {
+        timer.Send("splitOrStart");
+    }
+    accepted.Wait(TimeSpan.FromSeconds(5));
+    tcpListener.Stop();
+    Check("TCP timer sends LiveSplit's command", tcpLine == "startorsplit", tcpLine ?? "nothing received");
+
+    using (var server = new WebSocketTimer("127.0.0.1", 0))
+    using (var client = new System.Net.Sockets.TcpClient())
+    {
+        client.Connect("127.0.0.1", server.Port);
+        var stream = client.GetStream();
+        stream.Write(Encoding.ASCII.GetBytes(
+            "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+            "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"));
+        var handshake = ReadHeaders(stream);
+        Check("websocket handshake accepted", handshake.StartsWith("HTTP/1.1 101", StringComparison.Ordinal),
+            handshake.Split('\r').FirstOrDefault() ?? "no response");
+        Check("websocket accept key", handshake.Contains("s3pPLMBiTxaQ9kYGzzhZRbK+xOo=", StringComparison.Ordinal));
+        Check("websocket client registered", server.WaitForClient(TimeSpan.FromSeconds(2)));
+        server.Send("splitOrStart");
+        var frame = new byte[2];
+        ReadExact(stream, frame);
+        var payload = new byte[frame[1] & 0x7F];
+        if (payload.Length > 0)
+        {
+            ReadExact(stream, payload);
+        }
+        Check("websocket sends the JSON command",
+            Encoding.UTF8.GetString(payload) == "{\"command\":\"splitOrStart\"}",
+            Encoding.UTF8.GetString(payload));
     }
 
     // -------------------------------------------------------------- game config

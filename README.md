@@ -4,8 +4,8 @@ A Cel Damage save editor for [xemu](https://xemu.app). It reads and writes the g
 profile inside the emulator's Xbox HDD image (qcow2 or raw), unlocks the game's
 content, and can move a profile out of the image and back into it.
 
-The editor is a single self-contained .NET 8 program: a command line and a local web
-UI, built for Windows, Linux and macOS.
+The editor is a single self-contained .NET 8 program: a command line, a local web UI
+and the LiveSplit autosplitter, built for Windows, Linux and macOS.
 
 ## Download
 
@@ -33,6 +33,8 @@ Run the binary without arguments to open the web UI, or use the commands below.
   This is what makes an unlock survive the next boot.
 * **Exports profiles** to `.psc` files and **imports them back into the image**, so a
   save can be carried between machines or backed up without booting the game.
+* **Splits for speedruns**: watches the Smack Attack win flags in the profile and drives
+  LiveSplit, without touching the image.
 
 Every write keeps the profile text byte-for-byte the same length, so the save header
 and the FATX directory entry stay valid. Before writing, a timestamped copy of the HDD
@@ -49,6 +51,8 @@ CD-SaveEditor import FILE [--slot N]
                                     write a .psc file into the xemu HDD image
 CD-SaveEditor unlock [--dry-run]    unlock everything, in place
 CD-SaveEditor restore [--dry-run]   put the original values back
+CD-SaveEditor split [--dry-run | --serve PORT | --connect HOST:PORT]
+                                    watch the profile and split LiveSplit
 CD-SaveEditor serve [--port N] [--no-browser]
 ```
 
@@ -88,12 +92,25 @@ game rebuilds the profile unlocked and agrees with it; `restore` puts the origin
 block back from `saves/game_patch.json`. Everything else in the block (render and movie
 settings) is left untouched.
 
-## LiveSplit bridge
+## LiveSplit autosplitter
 
-`splitter/` still holds the Python LiveSplit bridge and the `All Smacks` splits file
-used for the speedrun timer. It is a separate tool (it only reads the HDD image and
-needs `app.py` for the image access) and is not part of the editor. See
-`splitter/README.md`.
+`CD-SaveEditor split` watches the Smack Attack win flags in the profile and sends
+`splitOrStart` to the timer. It only reads the HDD image, so it can run next to xemu.
+
+```
+CD-SaveEditor split --dry-run                    # print the timer commands instead
+CD-SaveEditor split --serve 16834                # LiveSplit One -> ws://localhost:16834
+CD-SaveEditor split --connect 127.0.0.1:16834    # LiveSplit -> Control -> Start TCP Server
+CD-SaveEditor split --serve 16834 --demo         # start, two splits, reset: wiring check
+CD-SaveEditor split --lss "All Smacks.lss"       # rewrite the splits file
+```
+
+Split options: `--event N` (0 smack, 1 race, 2 flag), `--interval SECONDS`, `--demo`.
+
+`All Smacks.lss` is generated from the same stage table the watcher uses: ten splits,
+one per Smack Attack stage that can record a win (`arenaWonFlags<arena>0`). The game
+ships twelve arenas, so Space 2 (`Lunarcy`) and Space 3 (`Shooting Stars`) have no win
+field and insert no split. Race and flag wins never split either.
 
 ## Build from source
 

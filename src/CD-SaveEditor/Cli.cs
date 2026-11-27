@@ -1,5 +1,6 @@
 using System.Globalization;
 using CDSaveEditor.Game;
+using CDSaveEditor.LiveSplit;
 using CDSaveEditor.Saves;
 using CDSaveEditor.Storage;
 
@@ -16,9 +17,15 @@ public static class Cli
         public string? File;
         public int Slot;
         public int Port = 8765;
+        public int? ServePort;
+        public string? Connect;
+        public string? Lss;
+        public double Interval = 1.0;
+        public string EventDigit = Arenas.SmackEvent;
         public bool DryRun;
         public bool NoBackup;
         public bool NoBrowser;
+        public bool Demo;
     }
 
     public static int Run(string[] args)
@@ -75,6 +82,24 @@ public static class Cli
                 case "--dry-run":
                     options.DryRun = true;
                     break;
+                case "--serve":
+                    options.ServePort = int.Parse(Next(args, ref i, arg), CultureInfo.InvariantCulture);
+                    break;
+                case "--connect":
+                    options.Connect = Next(args, ref i, arg);
+                    break;
+                case "--lss":
+                    options.Lss = Next(args, ref i, arg);
+                    break;
+                case "--interval":
+                    options.Interval = double.Parse(Next(args, ref i, arg), CultureInfo.InvariantCulture);
+                    break;
+                case "--event":
+                    options.EventDigit = Next(args, ref i, arg);
+                    break;
+                case "--demo":
+                    options.Demo = true;
+                    break;
                 case "--no-backup":
                     options.NoBackup = true;
                     break;
@@ -109,11 +134,24 @@ public static class Cli
             "import" => Import(options),
             "unlock" => Unlock(options),
             "restore" => Restore(options),
+            "split" or "livesplit" => Split(options),
             "serve" => WebUi.Run(options.Image, options.Iso, options.Port, !options.NoBrowser),
             null => WebUi.Run(options.Image, options.Iso, options.Port, !options.NoBrowser),
             _ => throw new ToolException($"unknown command {command} (try --help)"),
         };
     }
+
+    private static int Split(Options options) => Splitter.Run(new SplitterOptions
+    {
+        Image = options.Image,
+        ServePort = options.ServePort,
+        Connect = options.Connect,
+        DryRun = options.DryRun,
+        Demo = options.Demo,
+        Interval = options.Interval,
+        EventDigit = options.EventDigit,
+        Lss = options.Lss,
+    });
 
     private static string Next(string[] args, ref int index, string option)
     {
@@ -137,6 +175,8 @@ public static class Cli
                                                 write a .psc file into the xemu HDD image
               CD-SaveEditor unlock [--dry-run]  unlock everything, in place
               CD-SaveEditor restore [--dry-run] put the original values back
+              CD-SaveEditor split [--dry-run | --serve PORT | --connect HOST:PORT]
+                                                watch the profile and split LiveSplit
               CD-SaveEditor serve [--port N] [--no-browser]
                                                 start the web UI explicitly
 
@@ -147,6 +187,16 @@ public static class Cli
               --slot N       profile slot for import (default: 1)
               --no-backup    skip the timestamped copy of the HDD image
               --dry-run      show what would change without writing
+
+            Split options:
+              --serve PORT   host a WebSocket server for LiveSplit One
+              --connect HOST:PORT
+                             connect to LiveSplit's TCP server
+              --event N      event digit that counts as a win: 0 smack, 1 race,
+                             2 flag (default 0)
+              --interval N   seconds between progress checks (default 1.0)
+              --demo         send start, two splits and a reset, then exit
+              --lss PATH     write the All Smacks splits file and exit
             """);
     }
 
