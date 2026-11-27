@@ -59,8 +59,25 @@ mkdir -p "$(dirname "$OUT")" "$ROOT/build-macos/tmp"
 rm -f "$OUT"
 # hdiutil builds its scratch image in TMPDIR; point that at the workspace volume.
 export TMPDIR="$ROOT/build-macos/tmp"
-df -h "$TMPDIR" || true
-hdiutil create -volname "CD-SaveEditor" -srcfolder "$DMGROOT" -ov -format UDZO "$OUT" >/dev/null
+LOG="$ROOT/build-macos/hdiutil.log"
+BUILT=0
+for attempt in 1 2 3; do
+    rm -rf "$TMPDIR"/* 2>/dev/null || true
+    if hdiutil create -volname "CD-SaveEditor" -srcfolder "$DMGROOT" -ov -format UDZO "$OUT" >"$LOG" 2>&1; then
+        BUILT=1
+        break
+    fi
+    echo "hdiutil create failed (attempt $attempt):"
+    tail -3 "$LOG"
+    df -h "$TMPDIR" || true
+    rm -f "$OUT" "$OUT".temp.dmg
+    sleep 5
+done
+if [ "$BUILT" -ne 1 ]; then
+    echo "could not create $OUT" >&2
+    cat "$LOG" >&2
+    exit 1
+fi
 echo "built $OUT"
 rm -rf "$DMGROOT"
 
