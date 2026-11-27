@@ -7,7 +7,7 @@
     <AssemblyName>CD-SaveEditor</AssemblyName>
     <RootNamespace>CDSaveEditor</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <Version>1.0.0</Version>
+    <Version>1.1.1</Version>
     <Description>Cel Damage save editor for xemu Xbox HDD images</Description>
   </PropertyGroup>
 

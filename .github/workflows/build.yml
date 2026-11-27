@@ -51,10 +51,22 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(dotnet msbuild src/CD-SaveEditor/CD-SaveEditor.csproj -getProperty:Version)"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Publish
         run: >
           dotnet publish src/CD-SaveEditor/CD-SaveEditor.csproj
           -c Release
+          -p:Version=${{ steps.version.outputs.version }}
           -r ${{ matrix.rid }}
           --self-contained true
           -p:PublishSingleFile=true
