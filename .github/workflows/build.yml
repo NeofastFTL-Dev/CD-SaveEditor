@@ -220,9 +220,18 @@ jobs:
       - name: Android SDK platform
         run: |
           set -euo pipefail
-          SDKMANAGER="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
-          yes | "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          if [ -d "$SDK/platforms/android-36" ] && [ -d "$SDK/build-tools/36.0.0" ]; then
+            echo "android-36 and build-tools 36.0.0 are already installed"
+            exit 0
+          fi
+          # "yes | sdkmanager" ends with SIGPIPE, which pipefail would report as a failure
+          set +o pipefail
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          set -o pipefail
+          test -d "$SDK/platforms/android-36"
 
       - name: Build the APK
         run: |
@@ -240,12 +249,13 @@ jobs:
         run: |
           set -euo pipefail
           APK="dist/android/CD-SaveEditor-${{ needs.version.outputs.version }}-android.apk"
-          TOOLS="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          TOOLS="$SDK/cmdline-tools/latest/bin"
           "$TOOLS/apkanalyzer" manifest application-id "$APK" | grep -qx dev.neofastftl.cdsaveeditor
           "$TOOLS/apkanalyzer" manifest print "$APK" | grep -q "MainActivity"
           unzip -p "$APK" AndroidManifest.xml > /dev/null
           unzip -l "$APK" | grep -q "lib/arm64-v8a/libmonosgen-2.0.so"
-          "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools/36.0.0/apksigner" verify "$APK"
+          "$SDK/build-tools/36.0.0/apksigner" verify "$APK"
 
       - uses: actions/upload-artifact@v4
         with:
