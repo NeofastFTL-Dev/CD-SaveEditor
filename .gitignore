@@ -1,0 +1,8 @@
+bin/
+obj/
+.dotnet/
+saves/
+__pycache__/
+*.pyc
+*.bak-*
+*.orig
