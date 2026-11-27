@@ -1,0 +1,7 @@
+name: probe-macos
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: macos-15
+    steps:
+      - run: uname -a && sw_vers
