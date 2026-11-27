@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>CD-SaveEditor</AssemblyName>
+    <RootNamespace>CDSaveEditor.Android</RootNamespace>
+    <ApplicationId>dev.neofastftl.cdsaveeditor</ApplicationId>
+    <ApplicationVersion>1300</ApplicationVersion>
+    <ApplicationDisplayVersion>1.3.0</ApplicationDisplayVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AndroidUseAssemblyStore>true</AndroidUseAssemblyStore>
+    <Version>1.3.0</Version>
+    <Description>Cel Damage save editor for Android</Description>
+  </PropertyGroup>
+
+  <!-- The Android SDK adds these globally, which collides with Avalonia's Button and
+       Application; the files that need them import them explicitly. -->
+  <ItemGroup>
+    <Using Remove="Android.App" />
+    <Using Remove="Android.Widget" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Android" Version="11.3.23" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.23" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CD-SaveEditor.Core\CD-SaveEditor.Core.csproj" />
+    <ProjectReference Include="..\CD-SaveEditor.Mobile\CD-SaveEditor.Mobile.csproj" />
+  </ItemGroup>
+
+</Project>

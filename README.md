@@ -6,7 +6,8 @@ raw), unlocks the game's content, moves profiles in and out of the image, and dr
 speedrun timer from the game's own progress.
 
 One self-contained .NET 8 program with a desktop window (Avalonia), a command line and
-the splitter, built for Windows, Linux and macOS.
+the splitter, built for Windows, Linux and macOS, plus an Android app that edits the
+save on the phone.
 
 ## Install
 
@@ -41,6 +42,21 @@ right-click -> Open (or `xattr -dr com.apple.quarantine /Applications/CD-SaveEdi
 | Linux x64 | `...-linux-x64.deb`, `...-linux-x64.run` | `...-linux-x64.tar.gz` |
 | macOS Apple Silicon | `...-osx-arm64.dmg` | `...-osx-arm64.app.zip` |
 | macOS Intel | `...-osx-x64.dmg` | `...-osx-x64.app.zip` |
+| Android 7.0+ | `...-android.apk` | - |
+
+### Android
+
+Sideload `CD-SaveEditor-<version>-android.apk` (Android 7.0 / API 24 or newer). Open the
+downloaded file and allow "install unknown apps" for the app that opened it; it is signed
+with the standard Android debug key, so it installs from a file but cannot be published
+on Google Play as is. The APK carries arm64 (phones) and x86_64 (emulators) binaries.
+
+On the phone, **Choose HDD image** copies the `xbox_hdd.qcow2` into the app, where you can
+unlock everything, restore the originals or apply individual lock flags; **Save back**
+then replaces the file you picked. So the way to use it on the road is: copy the image
+from the PC, edit it on the phone, write it back, copy it to xemu again. The game ISO is
+optional and only needed for the lock-flag combination, which patches the game's startup
+defaults.
 
 ## What it does
 
@@ -159,9 +175,22 @@ bash installer/linux/build-run.sh publish/linux-x64 1.2.0 dist/CD-SaveEditor.run
 `/DMyAppVersion=...`), and `installer/macos/make-dmg.sh` builds the `.app` bundle and
 the `.dmg` on macOS.
 
+The Android app needs the Android workload and SDK (the build targets
+`net10.0-android` because that is what the current Avalonia Android package supports):
+
+```
+dotnet workload install android
+dotnet publish src/CD-SaveEditor.Android/CD-SaveEditor.Android.csproj -c Release \
+    -f net10.0-android -p:AndroidPackageFormat=apk -o dist/android
+```
+
+The phone layout is an Avalonia view shared with the desktop build, so it can be looked
+at without a device: `dotnet run --project src/CD-SaveEditor -- --mobile-screenshot
+phone.png --image <image>` renders it in a phone-sized window.
+
 `.github/workflows/build.yml` runs the smoke tests on every push, builds the Windows
-setup, the Linux `.deb`/`.run` and the macOS `.dmg` for both architectures, and attaches
-everything to a GitHub release when a tag such as `v1.2.0` is pushed.
+setup, the Linux `.deb`/`.run`, the macOS `.dmg` for both architectures and the Android
+APK, and attaches everything to a GitHub release when a tag such as `v1.3.0` is pushed.
 
 ## Notes and limits
 

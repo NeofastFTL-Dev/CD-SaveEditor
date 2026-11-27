@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 
@@ -11,18 +12,23 @@ public static class GuiHost
     internal static string? Iso;
     internal static string? Screenshot;
 
-    public static int Run(string? image = null, string? iso = null, string? screenshot = null)
+    /// <summary>When set, the window shows the phone layout and writes a screenshot there.</summary>
+    internal static string? MobileScreenshot;
+
+    public static int Run(string? image = null, string? iso = null, string? screenshot = null,
+        string? mobileScreenshot = null)
     {
         Image = image;
         Iso = iso;
         Screenshot = screenshot;
+        MobileScreenshot = mobileScreenshot;
         return AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .LogToTrace()
             .StartWithClassicDesktopLifetime(Array.Empty<string>());
     }
 
-    internal static void CaptureAndClose(MainWindow window, string path)
+    internal static void CaptureAndClose(Window window, string path)
     {
         try
         {

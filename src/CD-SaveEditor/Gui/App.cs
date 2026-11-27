@@ -18,6 +18,38 @@ public sealed class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // The Android screen is an Avalonia view, so the same layout can be opened
+            // in a phone-sized desktop window to check it without a device.
+            if (GuiHost.MobileScreenshot is { } mobilePath)
+            {
+                var preview = new Window
+                {
+                    Title = "CD-SaveEditor (phone layout)",
+                    Width = 412,
+                    Height = 900,
+                    Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#14161a")),
+                    Content = new CDSaveEditor.Mobile.MobileView(GuiHost.Image, GuiHost.Iso),
+                };
+                desktop.MainWindow = preview;
+                desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
+                preview.Closed += (_, _) =>
+                {
+                    if (OperatingSystem.IsLinux())
+                    {
+                        Environment.Exit(0);
+                    }
+                };
+                ((CDSaveEditor.Mobile.MobileView)preview.Content).Ready += () =>
+                    Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+                    {
+                        // let the wrapping panels settle before the capture
+                        await System.Threading.Tasks.Task.Delay(700);
+                        GuiHost.CaptureAndClose(preview, mobilePath);
+                    }, Avalonia.Threading.DispatcherPriority.Background);
+                base.OnFrameworkInitializationCompleted();
+                return;
+            }
+
             var window = new MainWindow(GuiHost.Image, GuiHost.Iso);
             desktop.MainWindow = window;
             desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;

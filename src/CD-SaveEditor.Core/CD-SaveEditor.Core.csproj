@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>CD-SaveEditor.Core</AssemblyName>
+    <RootNamespace>CDSaveEditor</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Version>1.3.0</Version>
+    <Description>Cel Damage save and disk image logic, shared by the desktop and Android apps</Description>
+  </PropertyGroup>
+
+</Project>

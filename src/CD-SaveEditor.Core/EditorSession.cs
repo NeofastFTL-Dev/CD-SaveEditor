@@ -21,12 +21,19 @@ public sealed class EditorSession
 {
     private readonly string? _image;
     private readonly string? _iso;
+    private readonly bool _backup;
     private readonly GameFiles _game = new(AppPaths.SaveDir);
 
-    public EditorSession(string? image = null, string? iso = null)
+    /// <param name="backup">
+    /// Keep a timestamped copy of the image before writing. The phone app turns this
+    /// off: it edits its own copy, and copying a multi-gigabyte image on a phone is
+    /// not worth it when the original file is only replaced on an explicit write-back.
+    /// </param>
+    public EditorSession(string? image = null, string? iso = null, bool backup = true)
     {
         _image = image;
         _iso = iso;
+        _backup = backup;
     }
 
     public string ImagePath => Xemu.ResolveImage(_image);
@@ -61,7 +68,7 @@ public sealed class EditorSession
             }
             else
             {
-                var result = ProfileEditor.Unlock(disk, saves, AppPaths.BaselineDir);
+                var result = ProfileEditor.Unlock(disk, saves, AppPaths.BaselineDir, doBackup: _backup);
                 message = $"Patched {result.Results.Count} save(s).";
                 if (result.Baselines.Count > 0)
                 {
@@ -107,7 +114,7 @@ public sealed class EditorSession
             }
             else
             {
-                var (results, backupPath) = ProfileEditor.Restore(disk, saves, baselines);
+                var (results, backupPath) = ProfileEditor.Restore(disk, saves, baselines, doBackup: _backup);
                 message = $"Restored the original values in {results.Count} save(s).";
                 if (results.Any(result => result.Mode == "rebuild"))
                 {
@@ -155,7 +162,7 @@ public sealed class EditorSession
             return Load(error: "no profile file given");
         }
         var path = Xemu.ResolveImage(_image);
-        var result = SaveStore.Import(path, file, slot);
+        var result = SaveStore.Import(path, file, slot, backup: _backup);
         return Load($"Wrote {Path.GetFileName(file)} into xemu slot {result.Slot + 1}. " +
                     "Start the game to load it.");
     }

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>CD-SaveEditor.Mobile</AssemblyName>
+    <RootNamespace>CDSaveEditor.Mobile</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Version>1.3.0</Version>
+    <Description>The phone-sized editor view, used by the Android app</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.23" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.23" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CD-SaveEditor.Core\CD-SaveEditor.Core.csproj" />
+  </ItemGroup>
+
+</Project>

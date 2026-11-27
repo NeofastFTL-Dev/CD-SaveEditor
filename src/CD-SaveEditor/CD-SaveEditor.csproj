@@ -10,9 +10,14 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationIcon>..\..\assets\icon.ico</ApplicationIcon>
-    <Version>1.2.1</Version>
+    <Version>1.3.0</Version>
     <Description>Cel Damage save editor and LiveSplit autosplitter for xemu</Description>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CD-SaveEditor.Core\CD-SaveEditor.Core.csproj" />
+    <ProjectReference Include="..\CD-SaveEditor.Mobile\CD-SaveEditor.Mobile.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.23" />

@@ -203,10 +203,60 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  android:
+    name: android apk
+    needs: [test, version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install the Android workload
+        run: dotnet workload install android
+
+      - name: Android SDK platform
+        run: |
+          set -euo pipefail
+          SDKMANAGER="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          yes | "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+
+      - name: Build the APK
+        run: |
+          set -euo pipefail
+          dotnet publish src/CD-SaveEditor.Android/CD-SaveEditor.Android.csproj \
+            -c Release -f net10.0-android -p:AndroidPackageFormat=apk \
+            -p:Version=${{ needs.version.outputs.version }} -o dist/android
+          APK="dist/android/CD-SaveEditor-${{ needs.version.outputs.version }}-android.apk"
+          cp dist/android/dev.neofastftl.cdsaveeditor-Signed.apk "$APK"
+          rm -f dist/android/dev.neofastftl.cdsaveeditor.apk \
+                dist/android/dev.neofastftl.cdsaveeditor-Signed.apk
+          ls -lh "$APK"
+
+      - name: Check the APK
+        run: |
+          set -euo pipefail
+          APK="dist/android/CD-SaveEditor-${{ needs.version.outputs.version }}-android.apk"
+          TOOLS="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin"
+          "$TOOLS/apkanalyzer" manifest application-id "$APK" | grep -qx dev.neofastftl.cdsaveeditor
+          "$TOOLS/apkanalyzer" manifest print "$APK" | grep -q "MainActivity"
+          unzip -p "$APK" AndroidManifest.xml > /dev/null
+          unzip -l "$APK" | grep -q "lib/arm64-v8a/libmonosgen-2.0.so"
+          "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools/36.0.0/apksigner" verify "$APK"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/android/*.apk
+          if-no-files-found: error
+
   release:
     name: release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [windows, linux, macos]
+    needs: [windows, linux, macos, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

@@ -27,6 +27,7 @@ public static class Cli
         public bool NoBackup;
         public bool Demo;
         public string? UiScreenshot;
+        public string? MobileScreenshot;
     }
 
     public static int Run(string[] args)
@@ -107,6 +108,9 @@ public static class Cli
                 case "--ui-screenshot":
                     options.UiScreenshot = Next(args, ref i, arg);
                     break;
+                case "--mobile-screenshot":
+                    options.MobileScreenshot = Next(args, ref i, arg);
+                    break;
                 default:
                     if (arg.StartsWith('-'))
                     {
@@ -136,7 +140,8 @@ public static class Cli
             "unlock" => Unlock(options),
             "restore" => Restore(options),
             "split" or "livesplit" => Split(options),
-            "gui" or null => GuiHost.Run(options.Image, options.Iso, options.UiScreenshot),
+            "gui" or null => GuiHost.Run(options.Image, options.Iso, options.UiScreenshot,
+                options.MobileScreenshot),
             "serve" => throw new ToolException(
                 "the web UI was removed; start CD-SaveEditor with no command for the desktop app"),
             _ => throw new ToolException($"unknown command {command} (try --help)"),
