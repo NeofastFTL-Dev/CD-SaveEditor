@@ -10,7 +10,7 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationIcon>..\..\assets\icon.ico</ApplicationIcon>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Description>Cel Damage save editor and LiveSplit autosplitter for xemu</Description>
   </PropertyGroup>
 

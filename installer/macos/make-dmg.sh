@@ -20,7 +20,8 @@ DMGROOT="$ROOT/build-macos/dmg"
 rm -rf "$ROOT/build-macos"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$DMGROOT"
 
-cp -R "$PUBLISH"/. "$APP/Contents/MacOS/"
+# Move rather than copy: the runner disk is tight and publish/ is not needed again.
+mv "$PUBLISH"/. "$APP/Contents/MacOS/"
 rm -f "$APP/Contents/MacOS"/*.pdb
 chmod +x "$APP/Contents/MacOS/CD-SaveEditor"
 cp "$HERE/../../assets/icon.icns" "$APP/Contents/Resources/AppIcon.icns"
@@ -52,10 +53,14 @@ codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || echo "codesign unavai
 cp -R "$APP" "$DMGROOT/"
 ln -s /Applications "$DMGROOT/Applications"
 
-mkdir -p "$(dirname "$OUT")"
+mkdir -p "$(dirname "$OUT")" "$ROOT/build-macos/tmp"
 rm -f "$OUT"
+# hdiutil builds its scratch image in TMPDIR; point that at the workspace volume.
+export TMPDIR="$ROOT/build-macos/tmp"
+df -h "$TMPDIR" || true
 hdiutil create -volname "CD-SaveEditor" -srcfolder "$DMGROOT" -ov -format UDZO "$OUT" >/dev/null
 echo "built $OUT"
+rm -rf "$DMGROOT"
 
 # The same bundle is what the portable zip ships.
 ditto -c -k --sequesterRsrc --keepParent "$APP" "${OUT%.dmg}.app.zip"

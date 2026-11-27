@@ -12,7 +12,12 @@ fi
 PUBLISH=$(cd "$1" && pwd)
 VERSION=$2
 ARCH=$3
-OUT=$(readlink -f "$4" 2>/dev/null || echo "$4")
+# Resolve against the caller's directory even when dist/ does not exist yet
+# (readlink -f needs the parent to exist, and we cd elsewhere to build the archive).
+case "$4" in
+    /*) OUT=$4 ;;
+    *) OUT="$PWD/$4" ;;
+esac
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(mktemp -d)
 trap 'rm -rf "$ROOT"' EXIT

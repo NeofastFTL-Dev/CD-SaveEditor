@@ -162,6 +162,14 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf ~/Library/Developer/CoreSimulator/Caches ~/Library/Developer/Xcode/DerivedData \
+            /Library/Developer/CoreSimulator/Caches 2>/dev/null || true
+          df -h /
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
@@ -187,7 +195,7 @@ jobs:
           hdiutil attach "dist/CD-SaveEditor-${{ needs.version.outputs.version }}-${{ matrix.rid }}.dmg" -nobrowse -mountpoint /tmp/cdse
           test -x "/tmp/cdse/CD-SaveEditor.app/Contents/MacOS/CD-SaveEditor"
           /tmp/cdse/CD-SaveEditor.app/Contents/MacOS/CD-SaveEditor --version
-          hdiutil detach /tmp/cdse
+          hdiutil detach /tmp/cdse -force || hdiutil detach /tmp/cdse || true
 
       - uses: actions/upload-artifact@v4
         with:
