@@ -20,8 +20,10 @@ DMGROOT="$ROOT/build-macos/dmg"
 rm -rf "$ROOT/build-macos"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$DMGROOT"
 
-# Move rather than copy: the runner disk is tight and publish/ is not needed again.
-mv "$PUBLISH"/. "$APP/Contents/MacOS/"
+# Move rather than copy (the runner disk is tight, and publish/ is not needed again).
+# BSD mv rejects "dir/.", so stream the tree and drop the source.
+(cd "$PUBLISH" && tar cf - .) | (cd "$APP/Contents/MacOS" && tar xf -)
+rm -rf "$PUBLISH"
 rm -f "$APP/Contents/MacOS"/*.pdb
 chmod +x "$APP/Contents/MacOS/CD-SaveEditor"
 cp "$HERE/../../assets/icon.icns" "$APP/Contents/Resources/AppIcon.icns"
