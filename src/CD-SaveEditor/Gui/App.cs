@@ -34,7 +34,9 @@ public sealed class App : Application
             };
             if (GuiHost.Screenshot is { } path)
             {
-                window.Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(
+                // Capture after the first load has been rendered, so the screenshot shows
+                // the slots and flags instead of the empty window.
+                window.Ready += () => Avalonia.Threading.Dispatcher.UIThread.Post(
                     () => GuiHost.CaptureAndClose(window, path),
                     Avalonia.Threading.DispatcherPriority.Background);
             }
