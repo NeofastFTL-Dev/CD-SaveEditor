@@ -1,5 +1,6 @@
 using System.Globalization;
 using CDSaveEditor.Game;
+using CDSaveEditor.Gui;
 using CDSaveEditor.LiveSplit;
 using CDSaveEditor.Saves;
 using CDSaveEditor.Storage;
@@ -24,8 +25,8 @@ public static class Cli
         public string EventDigit = Arenas.SmackEvent;
         public bool DryRun;
         public bool NoBackup;
-        public bool NoBrowser;
         public bool Demo;
+        public string? UiScreenshot;
     }
 
     public static int Run(string[] args)
@@ -103,8 +104,8 @@ public static class Cli
                 case "--no-backup":
                     options.NoBackup = true;
                     break;
-                case "--no-browser":
-                    options.NoBrowser = true;
+                case "--ui-screenshot":
+                    options.UiScreenshot = Next(args, ref i, arg);
                     break;
                 default:
                     if (arg.StartsWith('-'))
@@ -135,8 +136,9 @@ public static class Cli
             "unlock" => Unlock(options),
             "restore" => Restore(options),
             "split" or "livesplit" => Split(options),
-            "serve" => WebUi.Run(options.Image, options.Iso, options.Port, !options.NoBrowser),
-            null => WebUi.Run(options.Image, options.Iso, options.Port, !options.NoBrowser),
+            "gui" or null => GuiHost.Run(options.Image, options.Iso, options.UiScreenshot),
+            "serve" => throw new ToolException(
+                "the web UI was removed; start CD-SaveEditor with no command for the desktop app"),
             _ => throw new ToolException($"unknown command {command} (try --help)"),
         };
     }
@@ -177,8 +179,7 @@ public static class Cli
               CD-SaveEditor restore [--dry-run] put the original values back
               CD-SaveEditor split [--dry-run | --serve PORT | --connect HOST:PORT]
                                                 watch the profile and split LiveSplit
-              CD-SaveEditor serve [--port N] [--no-browser]
-                                                start the web UI explicitly
+              CD-SaveEditor gui                  start the desktop window (the default)
 
             Options:
               --image FILE   HDD image (qcow2 or raw); defaults to xemu's hdd_path

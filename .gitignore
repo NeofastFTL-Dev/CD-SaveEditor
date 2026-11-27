@@ -1,6 +1,9 @@
 bin/
 obj/
 .dotnet/
+publish/
+dist/
+build-macos/
 saves/
 __pycache__/
 *.pyc

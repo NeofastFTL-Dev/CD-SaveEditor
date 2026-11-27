@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=CD-SaveEditor
+GenericName=Game save editor
+Comment=Cel Damage save editor and LiveSplit autosplitter for xemu
+Exec=cd-saveeditor
+Icon=cd-saveeditor
+Terminal=false
+Categories=Game;Utility;
+Keywords=cel damage;xemu;save;editor;xbox;
+StartupNotify=true
+StartupWMClass=CD-SaveEditor

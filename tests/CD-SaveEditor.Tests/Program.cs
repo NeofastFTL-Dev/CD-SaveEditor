@@ -243,6 +243,17 @@ try
         Check("import rejects a malformed profile", true);
     }
 
+    // ----------------------------------------------------------- editor session
+    AppPaths.UseDataDir(Path.Combine(root, "session-data"));
+    var session = new EditorSession(rawPath);
+    var uiState = session.Load();
+    Check("the editor session lists the slots", uiState.Slots.Count == 2, uiState.Slots.Count.ToString());
+    Check("the editor session reports a locked slot", !uiState.Slots[0].Unlocked);
+    var exported = session.Export();
+    Check("the editor session exports profiles",
+        exported.Error is null && exported.Message.Contains("Exported to", StringComparison.Ordinal),
+        exported.Message);
+
     // ---------------------------------------------------------- splitter bridge
     Check("ten stages can split", Arenas.Count == 10, Arenas.Count.ToString());
     Check("stage names follow the arena table",

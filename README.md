@@ -1,26 +1,46 @@
 # CD-SaveEditor
 
-A Cel Damage save editor for [xemu](https://xemu.app). It reads and writes the game's
-profile inside the emulator's Xbox HDD image (qcow2 or raw), unlocks the game's
-content, and can move a profile out of the image and back into it.
+A Cel Damage save editor and LiveSplit autosplitter for [xemu](https://xemu.app). It
+reads and writes the game's profile inside the emulator's Xbox HDD image (qcow2 or
+raw), unlocks the game's content, moves profiles in and out of the image, and drives a
+speedrun timer from the game's own progress.
 
-The editor is a single self-contained .NET 8 program: a command line, a local web UI
-and the LiveSplit autosplitter, built for Windows, Linux and macOS.
+One self-contained .NET 8 program with a desktop window (Avalonia), a command line and
+the splitter, built for Windows, Linux and macOS.
 
-## Download
+## Install
 
-Grab the archive for your platform from the
-[latest release](https://github.com/NeofastFTL-Dev/CD-SaveEditor/releases) and unpack it
-anywhere. Every build is self-contained, so no .NET runtime is needed.
+Every download is self-contained: no .NET runtime, no extra packages.
 
-| Platform | Archive | Binary |
+### Windows
+
+Run `CD-SaveEditor-<version>-win-x64-setup.exe`. The wizard installs to
+`%LOCALAPPDATA%\Programs\CD-SaveEditor` (or `Program Files` when installed for all
+users), adds Start Menu entries, an optional desktop shortcut and an uninstaller in
+Apps & Features.
+
+### Linux
+
+* Debian/Ubuntu/Mint/Pop!_OS - `sudo apt install ./CD-SaveEditor-<version>-linux-x64.deb`
+  (or `sudo dpkg -i ...`), which installs `/opt/cd-saveeditor`, the `cd-saveeditor`
+  command, a menu entry and the icon. Remove with `sudo apt remove cd-saveeditor`.
+* Any distribution (Arch, Fedora, openSUSE, ...) - `sudo sh CD-SaveEditor-<version>-linux-x64.run`.
+  It installs to `/opt/cd-saveeditor`, links `/usr/local/bin/cd-saveeditor` and adds the
+  menu entry. `sudo sh CD-SaveEditor-<version>-linux-x64.run --uninstall` removes it.
+* A portable `...-linux-x64.tar.gz` is attached for running straight from a folder.
+
+### macOS
+
+Open `CD-SaveEditor-<version>-osx-<arm64|x64>.dmg` and drag **CD-SaveEditor** onto
+Applications. The build is not notarised by Apple, so the first launch needs
+right-click -> Open (or `xattr -dr com.apple.quarantine /Applications/CD-SaveEditor.app`).
+
+| Platform | Installer | Portable |
 | --- | --- | --- |
-| Windows | `CD-SaveEditor-win-x64.zip` | `CD-SaveEditor.exe` |
-| Linux | `CD-SaveEditor-linux-x64.tar.gz` | `CD-SaveEditor` |
-| macOS (Intel) | `CD-SaveEditor-osx-x64.tar.gz` | `CD-SaveEditor` |
-| macOS (Apple Silicon) | `CD-SaveEditor-osx-arm64.tar.gz` | `CD-SaveEditor` |
-
-Run the binary without arguments to open the web UI, or use the commands below.
+| Windows x64 | `...-win-x64-setup.exe` | `...-win-x64-portable.zip` |
+| Linux x64 | `...-linux-x64.deb`, `...-linux-x64.run` | `...-linux-x64.tar.gz` |
+| macOS Apple Silicon | `...-osx-arm64.dmg` | `...-osx-arm64.app.zip` |
+| macOS Intel | `...-osx-x64.dmg` | `...-osx-x64.app.zip` |
 
 ## What it does
 
@@ -33,27 +53,30 @@ Run the binary without arguments to open the web UI, or use the commands below.
   This is what makes an unlock survive the next boot.
 * **Exports profiles** to `.psc` files and **imports them back into the image**, so a
   save can be carried between machines or backed up without booting the game.
-* **Splits for speedruns**: watches the Smack Attack win flags in the profile and drives
-  LiveSplit, without touching the image.
+* **Splits for speedruns**: watches the Smack Attack win flags and drives LiveSplit,
+  without touching the image.
 
 Every write keeps the profile text byte-for-byte the same length, so the save header
 and the FATX directory entry stay valid. Before writing, a timestamped copy of the HDD
 image is made next to it (`*.bak-YYYYMMDD-HHMMSS`), and the first edit keeps the
 untouched profile in `saves/original`. The ISO is backed up once as `<iso>.orig`.
 
-## Commands
+## Using it
+
+Start `CD-SaveEditor` with no arguments for the window: pick a save slot, unlock,
+restore, export or write a profile back into xemu, or tick individual lock flags.
+
+The same operations are on the command line:
 
 ```
-CD-SaveEditor                       start the local web UI (http://127.0.0.1:8765)
+CD-SaveEditor                       open the desktop window
 CD-SaveEditor status                show the saves and the game file state
 CD-SaveEditor export [--out DIR]    write the profiles out as .psc files
 CD-SaveEditor import FILE [--slot N]
                                     write a .psc file into the xemu HDD image
 CD-SaveEditor unlock [--dry-run]    unlock everything, in place
 CD-SaveEditor restore [--dry-run]   put the original values back
-CD-SaveEditor split [--dry-run | --serve PORT | --connect HOST:PORT]
-                                    watch the profile and split LiveSplit
-CD-SaveEditor serve [--port N] [--no-browser]
+CD-SaveEditor split ...             LiveSplit autosplitter (see below)
 ```
 
 Options: `--image FILE` (HDD image), `--iso FILE` (game ISO), `--out DIR`, `--slot N`,
@@ -82,7 +105,7 @@ the game stores it: 24-byte header plus text).
 be exactly as long as the slot's current profile, which is always true for a file
 exported from the same slot; the game validates the header, so nothing is rewritten or
 re-padded. A different length is refused rather than corrupting the profile - use
-`unlock` or the web UI's per-flag toggles for changes inside the image.
+`unlock` or the per-flag toggles for changes inside the image.
 
 ## Game files
 
@@ -118,13 +141,27 @@ Requires the .NET 8 SDK:
 
 ```
 dotnet build src/CD-SaveEditor/CD-SaveEditor.csproj
-dotnet run --project src/CD-SaveEditor
-dotnet run --project tests/CD-SaveEditor.Tests     # smoke tests, no external packages
+dotnet run --project src/CD-SaveEditor        # opens the window
+dotnet run --project tests/CD-SaveEditor.Tests
 ```
 
-Release archives are produced by `.github/workflows/build.yml`: every push runs the
-smoke tests and builds `win-x64`, `linux-x64`, `osx-x64` and `osx-arm64`; pushing a tag
-such as `v1.0.0` attaches the four archives to a GitHub release.
+Packaging locally:
+
+```
+dotnet publish src/CD-SaveEditor/CD-SaveEditor.csproj -c Release -r linux-x64 \
+    --self-contained true -p:PublishSingleFile=true \
+    -p:IncludeNativeLibrariesForSelfExtract=true -o publish/linux-x64
+bash installer/linux/build-deb.sh publish/linux-x64 1.2.0 amd64 dist/CD-SaveEditor.deb
+bash installer/linux/build-run.sh publish/linux-x64 1.2.0 dist/CD-SaveEditor.run
+```
+
+`installer/windows/CD-SaveEditor.iss` is the Inno Setup script (CI runs it with
+`/DMyAppVersion=...`), and `installer/macos/make-dmg.sh` builds the `.app` bundle and
+the `.dmg` on macOS.
+
+`.github/workflows/build.yml` runs the smoke tests on every push, builds the Windows
+setup, the Linux `.deb`/`.run` and the macOS `.dmg` for both architectures, and attaches
+everything to a GitHub release when a tag such as `v1.2.0` is pushed.
 
 ## Notes and limits
 

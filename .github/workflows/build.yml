@@ -19,40 +19,19 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
-      - name: Run tests
-        run: dotnet run --project tests/CD-SaveEditor.Tests -c Release
+      - run: dotnet run --project tests/CD-SaveEditor.Tests -c Release
 
-  build:
-    name: ${{ matrix.rid }}
-    needs: test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            rid: win-x64
-            archive: CD-SaveEditor-win-x64.zip
-          - os: ubuntu-latest
-            rid: linux-x64
-            archive: CD-SaveEditor-linux-x64.tar.gz
-          # macOS runners are not available on this account, so the osx binaries
-          # are cross-published from Linux. Self-contained single-file output for
-          # both macOS architectures does not need a macOS host.
-          - os: ubuntu-latest
-            rid: osx-arm64
-            archive: CD-SaveEditor-osx-arm64.tar.gz
-          - os: ubuntu-latest
-            rid: osx-x64
-            archive: CD-SaveEditor-osx-x64.tar.gz
+  version:
+    name: version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
-
-      - name: Version
-        id: version
+      - id: version
         shell: bash
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
@@ -61,37 +40,172 @@ jobs:
             VERSION="$(dotnet msbuild src/CD-SaveEditor/CD-SaveEditor.csproj -getProperty:Version)"
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "building $VERSION"
+
+  windows:
+    name: windows installer
+    needs: [test, version]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish
+        shell: bash
+        run: >
+          dotnet publish src/CD-SaveEditor/CD-SaveEditor.csproj
+          -c Release -p:Version=${{ needs.version.outputs.version }}
+          -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish/win-x64
+
+      - name: Build setup.exe
+        shell: pwsh
+        env:
+          CD_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup not found at $iscc" }
+          & $iscc "installer\windows\CD-SaveEditor.iss"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+
+      - name: Portable zip
+        shell: pwsh
+        run: >
+          Compress-Archive -Path publish/win-x64/*
+          -DestinationPath "dist/CD-SaveEditor-${{ needs.version.outputs.version }}-win-x64-portable.zip"
+
+      - name: Check the installer exists
+        shell: pwsh
+        run: |
+          Get-ChildItem dist
+          if (-not (Test-Path "dist/CD-SaveEditor-${{ needs.version.outputs.version }}-win-x64-setup.exe")) {
+            throw "setup.exe was not produced"
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+          if-no-files-found: error
+
+  linux:
+    name: linux installers
+    needs: [test, version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
 
       - name: Publish
         run: >
           dotnet publish src/CD-SaveEditor/CD-SaveEditor.csproj
-          -c Release
-          -p:Version=${{ steps.version.outputs.version }}
-          -r ${{ matrix.rid }}
-          --self-contained true
-          -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
-          -o publish/${{ matrix.rid }}
+          -c Release -p:Version=${{ needs.version.outputs.version }}
+          -r linux-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish/linux-x64
 
-      - name: Package (unix)
-        if: runner.os != 'Windows'
-        run: tar -czf ${{ matrix.archive }} -C publish/${{ matrix.rid }} .
+      - name: Build .deb
+        run: >
+          bash installer/linux/build-deb.sh publish/linux-x64
+          "${{ needs.version.outputs.version }}" amd64
+          "dist/CD-SaveEditor-${{ needs.version.outputs.version }}-linux-x64.deb"
 
-      - name: Package (windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Compress-Archive -Path publish/${{ matrix.rid }}/* -DestinationPath ${{ matrix.archive }}
+      - name: Build .run
+        run: >
+          bash installer/linux/build-run.sh publish/linux-x64
+          "${{ needs.version.outputs.version }}"
+          "dist/CD-SaveEditor-${{ needs.version.outputs.version }}-linux-x64.run"
 
-      - name: Upload build
-        uses: actions/upload-artifact@v4
+      - name: Portable tarball
+        run: >
+          tar -czf "dist/CD-SaveEditor-${{ needs.version.outputs.version }}-linux-x64.tar.gz"
+          -C publish/linux-x64 .
+
+      - name: Validate the .deb
+        run: |
+          set -euo pipefail
+          dpkg-deb --info dist/*.deb
+          dpkg-deb --contents dist/*.deb | head -20
+          ar t dist/*.deb
+
+      - name: Install with the .run and start it
+        run: |
+          set -euo pipefail
+          export PREFIX="$RUNNER_TEMP/inst" BINDIR="$RUNNER_TEMP/bin"
+          export APPDIR="$RUNNER_TEMP/apps" ICONDIR="$RUNNER_TEMP/icons"
+          sh dist/*.run
+          test -x "$PREFIX/CD-SaveEditor"
+          "$PREFIX/CD-SaveEditor" --version
+          sh dist/*.run --uninstall
+          test ! -d "$PREFIX"
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: CD-SaveEditor-${{ matrix.rid }}
-          path: ${{ matrix.archive }}
+          name: linux
+          path: dist/*
           if-no-files-found: error
 
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+  macos:
+    name: macos ${{ matrix.rid }}
+    needs: [test, version]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: osx-arm64
+          - rid: osx-x64
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
-          files: ${{ matrix.archive }}
+          dotnet-version: "8.0.x"
+
+      - name: Publish
+        run: >
+          dotnet publish src/CD-SaveEditor/CD-SaveEditor.csproj
+          -c Release -p:Version=${{ needs.version.outputs.version }}
+          -r ${{ matrix.rid }} --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish/${{ matrix.rid }}
+
+      - name: Build .dmg
+        run: >
+          bash installer/macos/make-dmg.sh publish/${{ matrix.rid }}
+          "${{ needs.version.outputs.version }}"
+          "dist/CD-SaveEditor-${{ needs.version.outputs.version }}-${{ matrix.rid }}.dmg"
+
+      - name: Check the bundle
+        run: |
+          set -euo pipefail
+          ls -l dist
+          hdiutil attach "dist/CD-SaveEditor-${{ needs.version.outputs.version }}-${{ matrix.rid }}.dmg" -nobrowse -mountpoint /tmp/cdse
+          test -x "/tmp/cdse/CD-SaveEditor.app/Contents/MacOS/CD-SaveEditor"
+          /tmp/cdse/CD-SaveEditor.app/Contents/MacOS/CD-SaveEditor --version
+          hdiutil detach /tmp/cdse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
           generate_release_notes: true
